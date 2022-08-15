@@ -1,0 +1,21 @@
+﻿<Project Sdk="Microsoft.NET.Sdk">
+	<PropertyGroup>
+		<OutputType>Library</OutputType>
+		<TargetFramework>net6.0</TargetFramework>
+		<RootNamespace>Engine</RootNamespace>
+		<AllowUnsafeBlocks>True</AllowUnsafeBlocks>
+		<AssemblyName>$(MSBuildProjectName)</AssemblyName>
+		<BaseOutputPath>$(SolutionDir)Build/</BaseOutputPath>
+	</PropertyGroup>
+	<ItemGroup>
+	  <Compile Remove="OpenGL\**" />
+	  <EmbeddedResource Remove="OpenGL\**" />
+	  <None Remove="OpenGL\**" />
+	</ItemGroup>
+	<ItemGroup>
+	  <PackageReference Include="Silk.NET.Assimp" Version="2.16.0" />
+	</ItemGroup>
+	<ItemGroup>
+        <ProjectReference Include="..\Core\Engine.Core.csproj" />
+	</ItemGroup>
+</Project>

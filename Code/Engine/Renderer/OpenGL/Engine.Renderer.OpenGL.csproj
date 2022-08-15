@@ -1,0 +1,19 @@
+﻿<Project Sdk="Microsoft.NET.Sdk">
+	<PropertyGroup>
+		<OutputType>Library</OutputType>
+		<TargetFramework>net6.0</TargetFramework>
+		<RootNamespace>Engine</RootNamespace>
+		<AllowUnsafeBlocks>True</AllowUnsafeBlocks>
+		<AssemblyName>$(MSBuildProjectName)</AssemblyName>
+		<BaseOutputPath>$(SolutionDir)Build/</BaseOutputPath>
+	</PropertyGroup>
+    <ItemGroup>
+        <PackageReference Include="Silk.NET.OpenGL" Version="2.16.0" />
+        <PackageReference Include="Silk.NET.OpenGL.Extensions.ARB" Version="2.16.0" />
+        <PackageReference Include="SixLabors.ImageSharp" Version="2.1.3" />
+    </ItemGroup>
+	<ItemGroup>
+        <ProjectReference Include="..\Engine.Renderer.csproj" />
+        <ProjectReference Include="..\..\Core\Engine.Core.csproj" />
+	</ItemGroup>
+</Project>
