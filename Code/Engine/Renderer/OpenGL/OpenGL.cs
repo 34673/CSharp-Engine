@@ -2,15 +2,23 @@ using Silk.NET.Core.Native;
 using Silk.NET.OpenGL;
 using Silk.NET.OpenGL.Extensions.ARB;
 using System;
-using System.Collections.Generic;
+using System.Linq;
+using System.Numerics;
+using System.Runtime.InteropServices;
 namespace Engine.Renderer.OpenGL{
-	using Engine;
 	using Engine.Core;
 	using Engine.Renderer;
+	using SixLabors.ImageSharp.Memory;
+	using System.Collections.Generic;
+
 	public class OpenGL : IRenderer{
 		public static OpenGL current;
 		public GL API;
 		public ArbSparseBuffer SparseBuffer;
+        public List<VertexArray> vertexArrays = new();
+		public Dictionary<VertexArray,Buffer<float>> vertexBuffers = new();
+		public Dictionary<VertexArray,Buffer<uint>> indexBuffers = new();
+		public Dictionary<VertexArray,Buffer<DrawElementsCommand>> commandBuffers = new();
 		public double delta;
 		public OpenGL(){
 			OpenGL.current = this;
@@ -30,16 +38,19 @@ namespace Engine.Renderer.OpenGL{
 		public void Update(double delta){
 			this.delta = delta;
 			this.API.Clear(ClearBufferMask.ColorBufferBit|ClearBufferMask.DepthBufferBit);
-			foreach(var batch in RenderObject.all.Values){
-				batch.shader.Use();
-				batch.vertexArray.Bind();
-				foreach(var (name,property) in batch.material.properties){
+			//foreach(var batch in RenderObject.All){
+				/*foreach(var (name,property) in batch.material.properties){
 					batch.shader.SetUniform(name,property);
 				}
-				//this.API.DrawElements<uint>(PrimitiveType.Triangles,(uint)batch.indexBuffer.data.Length,DrawElementsType.UnsignedInt,null);
+				this.API.DrawElements<uint>(PrimitiveType.Triangles,(uint)batch.indexBuffer.data.Length,DrawElementsType.UnsignedInt,null);
+			}*/
+			foreach(var array in this.vertexArrays){
+				var commands = this.commandBuffers[array];
+				array.Bind();
+				Shader.all["Default"].Use();
+				this.API.BindBuffer(GLEnum.DrawIndirectBuffer,commands.handle);
+				this.API.MultiDrawElementsIndirect<DrawElementsCommand>(PrimitiveType.Triangles,DrawElementsType.UnsignedInt,null,(uint)commands.data.Count,0);
 			}
-			this.API.BindBuffer(GLEnum.DrawIndirectBuffer,RenderObject.commands.buffer.Handle);
-			this.API.MultiDrawElementsIndirect<DrawElementsCommand>(PrimitiveType.Triangles,DrawElementsType.UnsignedInt,null,(uint)RenderObject.commands.data.Length,0);
 		}
 		public void Log(GLEnum source,GLEnum type,int id,GLEnum severity,int length,nint message,nint userParam){
 			var color = Console.ForegroundColor;
@@ -53,38 +64,36 @@ namespace Engine.Renderer.OpenGL{
 			Console.WriteLine(SilkMarshal.PtrToString(message));
 			Console.ResetColor();
 		}
-		public void RegisterModel(string modelPath,string skinPath){
-			this.RegisterModel(Model.LoadFile(modelPath),Skin.LoadFile(skinPath));
+		public void AddModel(string modelPath,string skinPath){
+			this.AddModel(Model.LoadFile(modelPath),Skin.LoadFile(skinPath));
 		}
-		public void RegisterModel(Model model,Skin skin){
-			foreach(var (name,mesh) in model.submeshes){
+		public void AddModel(Model model,Skin skin){
+			if(!RenderObject.all.ContainsKey(model.name)){RenderObject.all[model.name] = new();}
+			var renderObject = RenderObject.all[model.name];
+			foreach(var (meshName,mesh) in model.submeshes){
+				var format = mesh.vertexAttributes.Values.Select(x=>Marshal.SizeOf(x[0]) / sizeof(float)).ToArray();
+				var dataSize = mesh.vertexAttributes.Values.Sum(x=>Marshal.SizeOf(x[0]) / sizeof(float) * x.Count);
+				var vertexData = new float[dataSize];
 				var offset = 0;
-				var components = 6;
-				var vertexBuffer = new float[mesh.vertices.Length * components];
+				renderObject.vertexArray = VertexArray.TryGet(format);
 				for(var item=0;item<mesh.vertices.Length;++item){
-					mesh.vertices.CopyTo(vertexBuffer,offset);
-					mesh.normals.CopyTo(vertexBuffer,offset+3);
-					offset += components;
+					foreach(var (name,attributes) in mesh.vertexAttributes){
+						var size = Marshal.SizeOf(attributes[0]) / sizeof(float);
+						if(size > 3){((Vector4)attributes[item]).CopyTo(vertexData,offset);}
+						else if(size > 2){((Vector3)attributes[item]).CopyTo(vertexData,offset);}
+						else if(size > 1){((Vector2)attributes[item]).CopyTo(vertexData,offset);}
+						if(renderObject.vertexArray.format.Count != format.Length){
+							renderObject.vertexArray.AddAttribute(name,size);
+						}
+						offset += size;
+					}
 				}
-				var batch = new RenderObject();
-				batch.vertexBuffer = new(this.API,vertexBuffer);
-				batch.indexBuffer = new(this.API,mesh.indices);
-				var vertexArray = batch.vertexArray = new(this.API);
-				vertexArray.AddVertexBuffer(batch.vertexBuffer.buffer.Handle,0,6);
-				vertexArray.AddIndexBuffer(batch.indexBuffer.buffer.Handle);
-				vertexArray.AddAttribute("Positions",3,0);
-				vertexArray.AddAttribute("Normals",3,0);
+				renderObject.vertexList.AddRange(vertexData);
+				renderObject.indexList.AddRange(mesh.indices);
 				skin.TryGetValue(mesh.name,out var materialName);
-				batch.material = Material.TryLoad(materialName ?? "Default");
-				batch.shader = Shader.TryLoad(batch.material.shader);
-				this.API.BufferSubData<DrawElementsCommand>(GLEnum.DrawIndirectBuffer,RenderObject.commands.data.Length,RenderObject.commands.data);
-				var command = new DrawElementsCommand();
-				command.count = (uint)batch.vertexBuffer.data.Length;
-				command.instances += 1;
-				command.firstIndex = 0;
-				command.baseVertex = 0;
-				command.baseInstance = 0;
-				RenderObject.all[model.name+"/"+name] = batch;
+				renderObject.material = Material.TryLoad(materialName ?? "Default");
+				renderObject.shader = Shader.TryLoad(renderObject.material.shader);
+				renderObject.CheckBuffers();
 			}
 		}
 		/*public void RegisterModel(Model model,Skin skin){

@@ -1,6 +1,8 @@
 using Silk.NET.Assimp;
 using System;
 using System.Collections.Generic;
+using System.Linq;
+using System.Runtime.InteropServices;
 using System.Numerics;
 using File = System.IO.File;
 namespace Engine.Renderer{
@@ -26,14 +28,20 @@ namespace Engine.Renderer{
 					for(var meshIndex=0;meshIndex<scene->MNumMeshes;++meshIndex){
 						var assimpMesh = scene->MMeshes[meshIndex];
 						var mesh = model.submeshes[assimpMesh->MName] = new();
-						var offset = 0;
+						var vertexAttributes = new[]{assimpMesh->MVertices,assimpMesh->MNormals,assimpMesh->MTangents,assimpMesh->MBitangents};
+						var attributeNames = new[]{"Positions","Normals","Tangents","Bitangents"};
+						var fields = new[]{mesh.vertices,mesh.normals};
 						mesh.name = assimpMesh->MName;
-						if(assimpMesh->MNumVertices > 0){
-							mesh.vertices = new Span<Vector3>(assimpMesh->MVertices,(int)assimpMesh->MNumVertices).ToArray();
-							mesh.normals = new Span<Vector3>(assimpMesh->MNormals,(int)assimpMesh->MNumVertices).ToArray();
+						for(var item=0;item<fields.Length;++item){
+							if(vertexAttributes[item] == null){continue;}
+							fields[item] = new Span<Vector3>(vertexAttributes[item],(int)assimpMesh->MNumVertices).ToArray();
+							var size = Marshal.SizeOf(vertexAttributes[item][0]) / sizeof(float);
+							var data = new Span<float>(vertexAttributes[item],size).ToArray().Select(x=>(object)x);
+							mesh.vertexAttributes[attributeNames[item]] = new(data);
 						}
 						if(assimpMesh->MNumFaces > 0){
-							//Assume all faces have the same number of indices for now. Variable NGons support not planned for now.
+							var offset = 0;
+							//Assume all faces have the same number of indices for now. Variable NGons support not planned at the moment.
 							var indexPerFace = (int)assimpMesh->MFaces[0].MNumIndices;
 							if(indexPerFace == 3){mesh.faceType = FaceType.Triangle;}
 							if(indexPerFace == 4){mesh.faceType = FaceType.Quadratic;}
