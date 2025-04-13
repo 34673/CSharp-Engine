@@ -1,52 +1,39 @@
-using Silk.NET.OpenGL;
-using System;
 using System.Collections.Generic;
 using System.Linq;
 namespace Engine.Renderer.OpenGL{
-	public class RenderObject{
-		public static Dictionary<string,RenderObject> all = new();
-		public Buffer<float> vertexBuffer;
-		public Buffer<uint> indexBuffer;
-		public Buffer<DrawElementsCommand> commandBuffer;
-		public DrawElementsCommand command;
-		public List<float> vertexList = new();
-		public List<uint> indexList = new();
-		public (int vertex,int index,int command) bufferOffset;
-		public VertexArray vertexArray;
+	public class RenderObject : RenderState{
+		public static Dictionary<string,RenderObject> all = [];
+		public int vertexOffset;
+		public int indexOffset;
+		public int indirectOffset;
+		public int[] uniformOffsets;
+		public nuint[] uniformSizes;
+		public int[] shaderStorageOffsets;
+		public nuint[] shaderStorageSizes;
         public Material material;
-        public Shader shader;
 		public RenderObject(){
-			var renderer = OpenGL.current;
-			renderer.vertexBuffers[this.vertexArray] = this.vertexBuffer = new(renderer.API);
-			renderer.indexBuffers[this.vertexArray] = this.indexBuffer = new(renderer.API);
-			renderer.commandBuffers[this.vertexArray] = this.commandBuffer = new(renderer.API);
+			this.uniformOffsets = new int[Globals.maxUniformBindings];
+			this.uniformSizes = new nuint[Globals.maxUniformBindings];
+			this.shaderStorageOffsets = new int[Globals.maxShaderStorageBindings];
+			this.shaderStorageSizes = new nuint[Globals.maxShaderStorageBindings];
+			this.shader = Shader.all["Default"];
+			this.material = Material.all["Default"];
 		}
-		public void UpdateBuffers(bool decommit=false){
-			var renderer = OpenGL.current;
-				this.command.instances += 1;
-				this.commandBuffer.data[this.bufferOffset.command] = this.command;
-			this.vertexArray.AddVertexBuffer(this.vertexBuffer.handle,this.vertexArray.format.Values.Sum());
-			this.vertexArray.AddIndexBuffer(this.indexBuffer.handle);
-			var offset = this.bufferOffset.command;
-			var length = this.commandBuffer.data.Count-offset;
-			var span = new Span<DrawElementsCommand>(commandBuffer.data.ToArray(),offset,length);
-			renderer.API.NamedBufferSubData<DrawElementsCommand>(commandBuffer.handle,offset,(uint)length,span);
-			if(this.vertexBuffer != null && this.command.instances < 1){
-				this.command.totalVertices = (uint)this.vertexList.Count;
-				this.command.instances = 1;
-				this.command.firstIndex = (uint)this.bufferOffset.index * sizeof(uint);
-				this.command.firstVertex = (uint)this.bufferOffset.vertex;
-				this.command.baseInstance = 0;
-				this.commandBuffer.data[this.bufferOffset.command] = this.command;
-			}
-			var command = new DrawElementsCommand();
+		public static void Sort(){
+			RenderObject.all = RenderObject.all.OrderBy(x=>x.Value.shader)
+				.ThenBy(x=>x.Value.textures)
+				.ThenBy(x=>x.Value.vertexArray)
+				.ThenBy(x=>x.Value.shaderStorageBuffers)
+				.ThenBy(x=>x.Value.uniformBuffers)
+				.ThenBy(x=>x.Value.vertexBuffers)
+				.ToDictionary();
 		}
 	}
 	public struct DrawElementsCommand{
-		public uint totalVertices;
+		public uint indexCount;
 		public uint instances;
 		public uint firstIndex;
-		public uint firstVertex;
+		public uint baseVertex;
 		public uint baseInstance;
 	}
 }

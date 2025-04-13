@@ -1,12 +1,16 @@
 ﻿<Project Sdk="Microsoft.NET.Sdk">
     <PropertyGroup>
         <OutputType>Library</OutputType>
-        <TargetFramework>net6.0</TargetFramework>
+        <TargetFramework>net9.0</TargetFramework>
         <RootNamespace>Game</RootNamespace>
         <AllowUnsafeBlocks>True</AllowUnsafeBlocks>
         <AssemblyName>$(MSBuildProjectName)</AssemblyName>
         <BaseOutputPath>$(SolutionDir)Build/</BaseOutputPath>
+		<CopyLocalLockFileAssemblies>true</CopyLocalLockFileAssemblies>
     </PropertyGroup>
+    <ItemGroup>
+      <PackageReference Include="System.Text.Json" Version="9.0.3" />
+    </ItemGroup>
     <ItemGroup>
       <ProjectReference Include="..\Engine\Core\Engine.Core.csproj" />
       <ProjectReference Include="..\Engine\Renderer\Engine.Renderer.csproj" />

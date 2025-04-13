@@ -3,16 +3,15 @@ using System.IO;
 using System.Linq;
 namespace Engine.Renderer{
 	public class Skin : Dictionary<string,string>{
-        public static Dictionary<string,Skin> all = new();
+        public static Dictionary<string,Skin> all = [];
         public string path;
-		public Skin(){}
-        public Skin(string filePath) => Skin.LoadFile(filePath);
+		public string name;
 		public static Skin LoadFile(string path){
 			var skin = new Skin();
 			skin.path = path = path.Replace('\\','/');
-			path = path.TrimEnd('.');
-			path = path.EndsWith(".skin") ? path : path+".skin";
-			if(!File.Exists(path)){return new();}
+			if(!path.EndsWith(".skin") || !File.Exists(path)){return skin;}
+			skin.path = path;
+			skin.name = path.Remove(path.LastIndexOf(".")).Substring(path.LastIndexOf('/')+1);
 			foreach(var line in File.ReadAllLines(path)){
 				var split = line.Split(",").Select(x=>x.Trim()).ToArray();
 				if(split[0] == ""){continue;}

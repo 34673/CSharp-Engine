@@ -14,7 +14,7 @@ namespace Engine.Core{
 			options.Size = new(1600,900);
 			options.Title = "Test";
 			options.VSync = false;
-			options.FramesPerSecond = 5000;
+			options.FramesPerSecond = 10000000;
 			Program.window = Window.Create(options);
 			Program.window.Load += Program.Start;
 			Program.window.Update += Program.Update;
@@ -29,7 +29,7 @@ namespace Engine.Core{
 			Program.frameTimer.Elapsed += (a,b)=>Program.window.Title = "Core: "+((int)(1/Program.delta)).ToString()+" fps";
 			Program.frameTimer.Start();
 		}
-		public static void Update(double delta){Program.delta = delta;}
+		public static void Update(double delta) => Program.delta = delta;
 		public static void KeyDown(IKeyboard keyboard,Key key,int arg){
 			if(key == Key.Escape){window.Close();}
 		}

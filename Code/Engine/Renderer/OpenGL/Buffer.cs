@@ -1,48 +1,45 @@
 using Silk.NET.OpenGL;
-using Silk.NET.OpenGL.Extensions.ARB;
 using System;
-using System.Collections.Generic;
+using System.Runtime.InteropServices;
 namespace Engine.Renderer.OpenGL{
-	public class Buffer<Type> : IDisposable where Type : unmanaged{
-		public GL renderer;
+	public unsafe class Buffer{
+		public OpenGL context;
 		public string name;
 		public uint handle;
-		public bool persistent;
-		public List<Type> data = new();
-		public Buffer(GL renderer){
-			this.renderer = renderer;
-            this.handle = this.renderer.CreateBuffer();
+		public nint size;
+		public nint pointer;
+		public Span<Type> AsSpan<Type>() => new((void*)this.pointer,(int)this.size / Marshal.SizeOf<Type>());
+		public nint Count<Type>() => this.size / 3 / Marshal.SizeOf<Type>();
+		public Buffer(nint size,string label="Buffer"){
+			var flags = GLEnum.MapWriteBit|GLEnum.MapPersistentBit|GLEnum.MapCoherentBit;
+			this.context = OpenGL.current;
+			this.name = label;
+            this.handle = this.context.API.CreateBuffer();
+			this.context.API.ObjectLabel(GLEnum.Buffer,this.handle,(uint)this.name.Length,this.name);
+			this.size = size * 3;
+			this.context.API.NamedBufferStorage(this.handle,(nuint)this.size,null,(uint)(flags|GLEnum.DynamicStorageBit));
+			this.pointer = (nint)this.context.API.MapNamedBufferRange(this.handle,0,(nuint)this.size,(uint)flags);
 		}
-		public void SetLabel(string name){
-			this.name = name;
-            this.renderer.ObjectLabel(GLEnum.Buffer,this.handle,(uint)name.Length,name);
+		public void BindIndirect(){
+			if(this.context.renderState.indirectBuffer == this){return;}
+			this.context.API.BindBuffer(GLEnum.DrawIndirectBuffer,this.handle);
+			this.context.renderState.indirectBuffer = this;
 		}
-		public void SetData(Span<Type> data,bool persistent=false,int mapOffset=0){
-			var flags = GLEnum.DynamicStorageBit;
-			var mapBits = GLEnum.MapWriteBit|GLEnum.MapReadBit|GLEnum.MapPersistentBit|GLEnum.MapCoherentBit;
-            flags |= persistent ? mapBits : (GLEnum)ARB.SparseStorageBitArb;
-			this.data = new(data.ToArray());
-            this.renderer.NamedBufferStorage<Type>(this.handle,data,(uint)flags);
-			if(!persistent){return;}
-			this.persistent = true;
-			unsafe{
-				this.renderer.MapNamedBufferRange(this.handle,mapOffset,(nuint)data.Length,(uint)flags);
+		public void BindRange(bool uniformBuffer,nint offset,nuint size,int bindingIndex=0){
+			var globalState = this.context.renderState;
+			var target = uniformBuffer ? GLEnum.UniformBuffer : GLEnum.ShaderStorageBuffer;
+			this.context.API.BindBufferRange(target,(uint)bindingIndex,this.handle,offset,size);
+			if(uniformBuffer && globalState.uniformBuffers[bindingIndex] != this){
+				globalState.uniformBuffers[bindingIndex] = this;
+			}
+			else if(globalState.shaderStorageBuffers[bindingIndex] != this){
+				globalState.shaderStorageBuffers[bindingIndex] = this;
 			}
 		}
-		public void SetRange(Span<Type> data,int startIndex=0){
-			this.renderer.NamedBufferSubData<Type>(this.handle,startIndex,(uint)data.Length,data);
-		}
-		public void Commit(int startIndex,int length){
-			if(this.persistent){return;}
-			OpenGL.current.SparseBuffer.NamedBufferPageCommitment(this.handle,startIndex,(uint)length,true);
-		}
-		public void Decommit(int startIndex,int length){
-			if(this.persistent){return;}
-			OpenGL.current.SparseBuffer.NamedBufferPageCommitment(this.handle,startIndex,(uint)length,false);
-		}
 		public void Dispose(){
-			if(this.persistent){this.renderer.UnmapNamedBuffer(this.handle);}
-			this.renderer.DeleteBuffers(1,this.handle);
+			this.context.API.UnmapNamedBuffer(this.handle);
+			this.context.API.DeleteBuffers(1,ref this.handle);
 		}
 	}
 }
+  

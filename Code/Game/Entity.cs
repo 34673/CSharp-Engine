@@ -13,9 +13,7 @@ namespace Game{
         }
         ~Entity() => Program.window.Update -= this.Update;
         public virtual void Start(){}
-        public virtual void Update(double delta){
-            this.delta = delta;
-        }
+        public virtual void Update(double delta) => this.delta = delta;
     }
 }
  

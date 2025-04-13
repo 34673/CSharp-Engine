@@ -7,28 +7,29 @@ using Silk.NET.OpenGL;
 namespace Engine.Renderer.OpenGL{
     using Engine.Core;
 	public class Shader : IDisposable{
-        public static Dictionary<string,Shader> all = new();
+        public static Dictionary<string,Shader> all = [];
 		public string name;
         public string path;
 		public uint programHandle;
-        public Dictionary<string,uint> stageHandles = new();
+        public Dictionary<string,uint> stageHandles = [];
 		public GL renderer;
         static Shader(){
             var paths = Directory.EnumerateFiles(FileSystem.contentDirectory,"*.glsl",SearchOption.AllDirectories);
             foreach(var path in paths){
                 var key = path.Split('/','\\').Last().Replace(".glsl","").Replace("@","");
                 var shader = Shader.all[key] = new();
-                shader.name = key;
+                shader.name = $"{key} Program";
                 shader.path = path;
             }
         }
         public Shader(){}
         public static Shader TryLoad(string name){
-            if(!Shader.all.ContainsKey(name)){return Shader.all["Default"];}
-            var shader = Shader.all[name];
+			Shader.all.TryGetValue(name,out var shader);
+            if(shader is null){return Shader.all["Default"];}
             if(shader.stageHandles.Count < 1){
                 shader.renderer = OpenGL.current.API;
                 shader.programHandle = shader.renderer.CreateProgram();
+				OpenGL.current.API.ObjectLabel(GLEnum.Program,shader.programHandle,(uint)shader.name.Length,shader.name);
                 shader.Parse();
                 shader.Link();
                 foreach(var stage in shader.stageHandles.Values){
@@ -44,6 +45,7 @@ namespace Engine.Renderer.OpenGL{
             var stageStart = -1;
             var stageBounds = (start:-1,end:-1);
             var stage = "";
+			var name = "";
             stageMap["Vertex"] = ShaderType.VertexShader;
             stageMap["TessellationControl"] = ShaderType.TessControlShader;
             stageMap["Control"] = ShaderType.TessControlShader;
@@ -62,15 +64,18 @@ namespace Engine.Renderer.OpenGL{
                 if(split[0] != "#define" || split[1] != "Stage"){continue;}
                 if(stageStart > -1){
                     stageBounds = (stageStart+1,line);
-                    this.stageHandles[stage] = this.Compile(stageType,String.Join("\n",file[stageBounds.start..stageBounds.end]));
+                    this.stageHandles[stage] = this.Compile(stageType,string.Join("\n",file[stageBounds.start..stageBounds.end]));
+					this.renderer.ObjectLabel(GLEnum.Shader,this.stageHandles[stage],(uint)name.Length,name);
                 }
                 stage = split[2];
+				name = $"{this.name.Replace(" Program","")} {stage}";
                 if(!stageMap.ContainsKey(stage)){continue;}
                 stageType = stageMap[stage];
                 stageStart = line;
             }
             stageBounds = (stageStart+1,file.Length);
-            this.stageHandles[stage] = this.Compile(stageType,String.Join("\n",file[stageBounds.start..stageBounds.end]));
+            this.stageHandles[stage] = this.Compile(stageType,string.Join("\n",file[stageBounds.start..stageBounds.end]));
+			this.renderer.ObjectLabel(GLEnum.Shader,this.stageHandles[stage],(uint)name.Length,name);
         }
         public uint Compile(ShaderType type,string source){
 			var handle = this.renderer.CreateShader(type);
@@ -89,7 +94,7 @@ namespace Engine.Renderer.OpenGL{
             this.renderer.LinkProgram(this.programHandle);
 			this.renderer.GetProgram(this.programHandle,GLEnum.LinkStatus,out var status);
 			if(status == 0){
-                throw new($"Program failed to link with error: {this.renderer.GetProgramInfoLog(programHandle)}");
+                throw new($"Program failed to link with error: {this.renderer.GetProgramInfoLog(this.programHandle)}");
             }
         }
 		public void SetUniform<Type>(string name,Type value){

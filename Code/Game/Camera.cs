@@ -5,11 +5,10 @@ namespace Game{
         public static Camera main;
         public float fieldOfView = 90f;
         public (float minimum,float maximum) zoomBounds = (1f,45f);
-        public float zoom => Math.Clamp(1f,zoomBounds.minimum,zoomBounds.maximum);
+        public float zoom => Math.Clamp(1f,this.zoomBounds.minimum,this.zoomBounds.maximum);
         public float aspectRatio = 1920/1080;
         public Camera() : base(){}
         public Matrix4x4 viewMatrix => Matrix4x4.CreateLookAt(this.transform.position,this.transform.position + this.transform.front,this.transform.up);
-        public Matrix4x4 projectionMatrix => Matrix4x4.CreatePerspectiveFieldOfView(this.ToRadians(this.zoom),this.aspectRatio,0.1f,100f);
-        public float ToRadians(float degrees) => MathF.PI / 180f * degrees;
+        public Matrix4x4 projectionMatrix => Matrix4x4.CreatePerspectiveFieldOfView(float.DegreesToRadians(this.zoom),this.aspectRatio,0.1f,100f);
     }
 }
