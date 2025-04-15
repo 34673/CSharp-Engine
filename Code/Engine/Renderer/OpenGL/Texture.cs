@@ -7,7 +7,7 @@ using System.Collections.Generic;
 using System.IO;
 using System.Numerics;
 public class Texture : IDisposable{
-	public static Dictionary<string,Texture> all = new();
+	public static Dictionary<string,Texture> all = [];
 	public string path;
 	public uint handle;
 	public GL renderer;

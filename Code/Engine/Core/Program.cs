@@ -1,6 +1,7 @@
 namespace Engine.Core;
 using Silk.NET.Input;
 using Silk.NET.Windowing;
+using System;
 using System.Linq;
 using SystemTimer = System.Timers.Timer;
 public static class Program{
@@ -11,10 +12,16 @@ public static class Program{
 		var renderer = Loader.GetAssembly("Engine.Renderer.OpenGL");
 		var game = Loader.GetAssembly("Game");
 		var options = WindowOptions.Default;
+		var context = new GraphicsAPI();
+		context.API = ContextAPI.OpenGL;
+		context.Flags = ContextFlags.Debug;
+		context.Profile = ContextProfile.Core;
+		context.Version = new(4,6);
 		options.Size = new(1600,900);
 		options.Title = "Test";
 		options.VSync = false;
 		options.FramesPerSecond = 10000000;
+		options.API = context;
 		Program.window = Window.Create(options);
 		Program.window.Load += Program.Start;
 		Program.window.Update += Program.Update;
