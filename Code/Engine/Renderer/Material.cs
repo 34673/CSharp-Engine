@@ -24,34 +24,33 @@ public class Material{
 	}
 	public Material(){}
 	public static Material TryLoad(string name){
-		if(!Material.all.ContainsKey(name)){return Material.all["Default"];}
-		var material = Material.all[name];
+		Material.all.TryGetValue(name,out var material);
+		if(material is null){return Material.all["Default"];}
 		if(name != "Default" && material.properties.Count < 1){material.Load();}
 		return material;
 	}
 	public static object ParseValue(string value){
-		if(value.Contains("(")){
+		if(value.Contains('(')){
 			var values = value.Trim('(',')').Split(',').Select(x=>x.Trim()).ToArray();
-			if(values.Length < 2 || values.Length > 4){return default;}
+			if(values.Length is < 2 or > 4) {return default;}
 			var floats = values.Select(x=>float.Parse(x,CultureInfo.InvariantCulture.NumberFormat)).ToArray();
 			if(values.Length == 2){return new Vector2(floats[0],floats[1]);}
 			if(values.Length == 3){return new Vector3(floats[0],floats[1],floats[2]);}
 			if(values.Length == 4){return new Vector4(floats[0],floats[1],floats[2],floats[3]);}
 		}
-		if(value.Contains('.')){return float.Parse(value);}
-		return int.Parse(value); 
+		return value.Contains('.') ? float.Parse(value) : int.Parse(value);
 	}
 	public void Load(){
 		var path = this.path.TrimEnd('.');
-		path = path.EndsWith(".material") ? path : path+".material";
+		path = path.EndsWith(".material") ? path : $"{path}.material";
 		if(!File.Exists(path)){return;}
 		var scope = 0;
 		foreach(var line in File.ReadAllLines(path)){
 			var indented = line.StartsWith('\t') || line.StartsWith(' ');
 			if(scope > 0 && !indented){break;}
 			if(scope == 0){
-				if(!line.Contains(":")){return;}
-				var split = line.Split("=");
+				if(!line.Contains(':')){return;}
+				var split = line.Split('=');
 				this.name = split.First().Trim();
 				this.shader = split.Last().Trim(':').Trim();
 				scope += 1;

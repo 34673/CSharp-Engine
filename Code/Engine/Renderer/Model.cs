@@ -18,7 +18,7 @@ public class Model{
 		path = path.Replace('\\','/');
 		if(!File.Exists(path)){return model;}
 		model.path = path;
-		model.name = path.Remove(path.LastIndexOf(".")).Substring(path.LastIndexOf('/')+1);
+		model.name = path[(path.LastIndexOf('/') + 1)..path.LastIndexOf('.')];
 		var importFlags = PostProcessSteps.JoinIdenticalVertices|PostProcessSteps.GenerateNormals|PostProcessSteps.MakeLeftHanded|PostProcessSteps.FixInFacingNormals;
 		var scene = Model.importer.ImportFile(path,(uint)importFlags);
 		if(scene is null){throw new(Model.importer.GetErrorStringS());}
@@ -63,9 +63,9 @@ public class Model{
 					if(indexPerFace > 4){mesh.faceType = FaceType.NGon;}
 					mesh.indices = new uint[assimpMesh->MNumFaces * indexPerFace];
 					for(var faceIndex = 0;faceIndex < assimpMesh->MNumFaces;faceIndex += 1){
-						var face = assimpMesh->MFaces[faceIndex];
+						var face = &assimpMesh->MFaces[faceIndex];
 						for(var index = 0;index < indexPerFace;index += 1){
-							mesh.indices[offset+index] = face.MIndices[index];
+							mesh.indices[offset+index] = face->MIndices[index];
 						}
 						offset += indexPerFace;
 					}

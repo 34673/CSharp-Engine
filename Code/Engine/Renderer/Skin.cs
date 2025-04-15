@@ -11,7 +11,7 @@ public class Skin : Dictionary<string,string>{
 		skin.path = path = path.Replace('\\','/');
 		if(!path.EndsWith(".skin") || !File.Exists(path)){return skin;}
 		skin.path = path;
-		skin.name = path.Remove(path.LastIndexOf('.')).Substring(path.LastIndexOf('/')+1);
+		skin.name = path[(path.LastIndexOf('/') + 1)..path.LastIndexOf('.')];
 		foreach(var line in File.ReadAllLines(path)){
 			var split = line.Split(",").Select(x=>x.Trim()).ToArray();
 			if(split[0] == ""){continue;}

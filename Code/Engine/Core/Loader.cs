@@ -23,9 +23,9 @@ public static class Loader{
 		return instance;
 	}
 	public static void Link(Assembly assembly,string fieldPath,object value){
-		var separator = fieldPath.LastIndexOf(".");
-		var fieldName = fieldPath.Substring(separator+1);
-		var parentPath = fieldPath.Remove(separator);
+		var separator = fieldPath.LastIndexOf('.');
+		var fieldName = fieldPath[(separator + 1)..];
+		var parentPath = fieldPath[0..separator];
 		var parent = assembly.GetType(parentPath);
 		parent.GetField(fieldName).SetValue(null,value);
 	}
