@@ -6,12 +6,12 @@ using Engine.Renderer;
 		public double delta;
 		public Transform transform = new();
 		public Entity(){
-			Program.window.Update += this.Update;
+			Import.window.Update += this.Update;
 			this.transform.rotation = Quaternion.Identity;
 			this.transform.scale = 1f;
 			this.Start();
 		}
-		~Entity() => Program.window.Update -= this.Update;
+		~Entity() => Import.window.Update -= this.Update;
 		public virtual void Start(){}
 		public virtual void Update(double delta) => this.delta = delta;
 	}

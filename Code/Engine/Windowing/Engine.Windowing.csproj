@@ -1,0 +1,19 @@
+﻿<Project Sdk="Microsoft.NET.Sdk">
+	<PropertyGroup>
+		<OutputType>Library</OutputType>
+		<TargetFramework>net9.0</TargetFramework>
+		<RootNamespace>Engine</RootNamespace>
+		<AllowUnsafeBlocks>True</AllowUnsafeBlocks>
+		<AssemblyName>$(MSBuildProjectName)</AssemblyName>
+		<BaseOutputPath>$(SolutionDir)Build/</BaseOutputPath>
+		<CopyLocalLockFileAssemblies>true</CopyLocalLockFileAssemblies>
+	</PropertyGroup>
+	<ItemGroup>
+		<Compile Remove="OpenGL\**" />
+		<EmbeddedResource Remove="OpenGL\**" />
+		<None Remove="OpenGL\**" />
+	</ItemGroup>
+	<ItemGroup>
+		<PackageReference Include="Silk.NET.Windowing" Version="2.22.0" />
+	</ItemGroup>
+</Project>

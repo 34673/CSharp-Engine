@@ -12,7 +12,7 @@ public static class Loader{
 		if(assembly != null){Loader.assemblies[key] = assembly;}
 		return assembly;
 	}
-	public static object Instantiate(Assembly assembly,string classPath){
+	public static Type Instantiate<Type>(Assembly assembly,string classPath){
 		var key = assembly.Location.Replace(Loader.fileExtension,"");
 		if(!Loader.assemblies.ContainsKey(key)){Loader.assemblies[key] = assembly;}
 		var instance = assembly.CreateInstance(classPath);
@@ -20,8 +20,9 @@ public static class Loader{
 			if(!Loader.instances.ContainsKey(classPath)){Loader.instances[classPath] = [];}
 			Loader.instances[classPath].Add(instance);
 		}
-		return instance;
+		return (Type)instance;
 	}
+	public static object Instantiate(Assembly assembly,string classPath) => Loader.Instantiate<object>(assembly,classPath);
 	public static void Link(Assembly assembly,string fieldPath,object value){
 		var separator = fieldPath.LastIndexOf('.');
 		var fieldName = fieldPath[(separator + 1)..];

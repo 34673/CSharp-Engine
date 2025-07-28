@@ -6,17 +6,16 @@ using Silk.NET.OpenGL.Extensions.ARB;
 using System;
 using System.Linq;
 using System.Runtime.InteropServices;
-using CoreProgram = Engine.Core.Program;
+using Program = Engine.Core.Program;
 public class OpenGL : IRenderer{
 	public static OpenGL current;
 	public GL API;
-	public ArbSparseBuffer SparseBuffer;
 	public RenderState renderState;
 	public double delta;
 	public OpenGL(){
 		OpenGL.current = this;
-		CoreProgram.window.Load += this.Start;
-		CoreProgram.window.Render += this.Update;
+		Import.window.Load += this.Start;
+		Import.window.Render += this.Update;
 	}
 	public static void Log(GLEnum source,GLEnum type,int id,GLEnum severity,int length,nint message,nint userParam){
 		var color = Console.ForegroundColor;
@@ -31,54 +30,55 @@ public class OpenGL : IRenderer{
 		Console.ResetColor();
 	}
 	public void Start(){
-		this.API = GL.GetApi(CoreProgram.window);
-		this.SparseBuffer = new(this.API.Context);
-		CoreProgram.frameTimer.Elapsed += (a,b)=>CoreProgram.window.Title += $" | Renderer (OpenGL): {(int)(1 / this.delta)} fps";
-		this.API.Enable(EnableCap.DebugOutputSynchronous|EnableCap.DepthTest|EnableCap.CullFace);
-		this.API.DebugMessageControl(DebugSource.DontCare,DebugType.DontCare,DebugSeverity.DontCare,0,0,true);
-		this.API.DebugMessageCallback(OpenGL.Log,(nint)null);
+		Program.frameTimer.Elapsed += (a,b)=>Import.window.Title += $" | Renderer (OpenGL): {(int)(1 / this.delta)} fps";
+		var debugIDs = (uint)0;
+		var debugParameters = (nint)0;
+		this.API = GL.GetApi(Import.window);
+		Extensions.Start();
+		this.API.Enable(EnableCap.DebugOutput|EnableCap.DepthTest|EnableCap.CullFace);
+		this.API.DebugMessageControl(DebugSource.DontCare,DebugType.DontCare,DebugSeverity.DontCare,0,ref debugIDs,true);
+		this.API.DebugMessageCallback(OpenGL.Log,ref debugParameters);
 		Globals.Start(this.API);
 		this.API.ClearColor(0f,0f,0.4f,0f);
 		this.API.CullFace(GLEnum.Back);
 		this.renderState = new();
+		Globals.PrintAll();
 	}
 	public void Update(double delta){
 		this.delta = delta;
 		RenderObject.Sort();
-		this.API.Clear(ClearBufferMask.ColorBufferBit|ClearBufferMask.DepthBufferBit);
+		this.API.Clear(ClearBufferMask.ColorBufferBit|ClearBufferMask.DepthBufferBit|ClearBufferMask.StencilBufferBit);
 		foreach(var renderObject in RenderObject.all.Values){
 			this.CheckRenderState(renderObject);
 			foreach(var (name,property) in renderObject.material.properties){
 				renderObject.shader.SetUniform(name,property);
 			}
+			//renderObject.shader.SetUniform("objectMatrix",renderObject.transform.matrix);
 			this.API.MultiDrawElementsIndirect<DrawElementsCommand>(PrimitiveType.Triangles,DrawElementsType.UnsignedInt,null,1,0);
 		}
 	}
 	public void CheckRenderState(RenderObject renderObject){
 		var globalState = this.renderState;
-		renderObject.indirectBuffer.BindIndirect();
-		renderObject.vertexArray.Bind();
-		renderObject.vertexArray.SetIndexBuffer(renderObject.indexBuffer);
+		renderObject.indirectBuffer?.BindIndirect();
+		renderObject.vertexArray?.Bind();
+		renderObject.vertexArray?.SetIndexBuffer(renderObject.indexBuffer);
 		for(var index = 0; index < renderObject.vertexBuffers.Length; index += 1){
-			if(renderObject.vertexBuffers[index] is null){continue;}
-			renderObject.vertexArray.SetVertexBuffer(renderObject.vertexBuffers[index],index,renderObject.vertexOffset);
+			renderObject.vertexArray?.SetVertexBuffer(renderObject.vertexBuffers[index],index,renderObject.vertexOffset);
 		}
 		for(var index = 0; index < renderObject.uniformBuffers.Length; index += 1){
-			if(renderObject.uniformBuffers[index] is null){continue;}
-			renderObject.uniformBuffers[index].BindRange(true,renderObject.uniformOffsets[index],renderObject.uniformSizes[index]);
+			renderObject.uniformBuffers[index]?.BindRange(true,renderObject.uniformOffsets[index],renderObject.uniformSizes[index]);
 		}
 		for(var index = 0; index < renderObject.shaderStorageBuffers.Length; index += 1){
-			if(renderObject.shaderStorageBuffers[index] is null){continue;}
-			renderObject.shaderStorageBuffers[index].BindRange(false,renderObject.shaderStorageOffsets[index],renderObject.shaderStorageSizes[index]);
+			renderObject.shaderStorageBuffers[index]?.BindRange(false,renderObject.shaderStorageOffsets[index],renderObject.shaderStorageSizes[index]);
 		}
 		for(var index = 0; index < renderObject.textures.Length; index += 1){
 			if(globalState.textures[index] == renderObject.textures[index]){continue;}
-			renderObject.textures[index].Bind((TextureUnit)index);
+			renderObject.textures[index]?.Bind((TextureUnit)index);
 		}
-		if(globalState.shader != renderObject.shader){renderObject.shader.Use();}
+		if(globalState.shader != renderObject.shader){renderObject.shader?.Use();}
 	}
-	public void AddModel(string modelPath,string skinPath) => this.AddModel(Model.LoadFile(modelPath),Skin.LoadFile(skinPath));
-	public unsafe void AddModel(Model model,Skin skin){
+	public void AddModel(string modelPath,string skinPath,Transform transform) => this.AddModel(Model.LoadFile(modelPath),Skin.LoadFile(skinPath),transform);
+	public unsafe void AddModel(Model model,Skin skin,Transform transform){
 		RenderObject.all.TryGetValue(model.name,out var renderObject);
 		if(renderObject is not null){
 			renderObject = RenderObject.all[model.name];

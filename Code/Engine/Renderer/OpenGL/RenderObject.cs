@@ -11,6 +11,7 @@ public class RenderObject : RenderState{
 	public int[] shaderStorageOffsets;
 	public nuint[] shaderStorageSizes;
 	public Material material;
+	public Transform transform;
 	public RenderObject(){
 		this.uniformOffsets = new int[Globals.maxUniformBindings];
 		this.uniformSizes = new nuint[Globals.maxUniformBindings];
