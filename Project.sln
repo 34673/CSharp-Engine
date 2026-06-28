@@ -1,7 +1,7 @@
 ﻿
 Microsoft Visual Studio Solution File, Format Version 12.00
-# Visual Studio Version 17
-VisualStudioVersion = 17.0.31612.314
+# Visual Studio Version 18
+VisualStudioVersion = 18.5.11801.241 oobstable
 MinimumVisualStudioVersion = 15.0.26124.0
 Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "Engine.Core", "Code\Engine\Core\Engine.Core.csproj", "{59657C47-8BE3-426C-8E59-D44A52D7CD00}"
 EndProject

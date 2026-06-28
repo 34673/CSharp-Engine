@@ -1,17 +1,17 @@
 namespace Engine.Renderer.OpenGL;
 using Silk.NET.OpenGL;
-using SixLabors.ImageSharp;
-using SixLabors.ImageSharp.PixelFormats;
+//using SixLabors.ImageSharp;
+//using SixLabors.ImageSharp.PixelFormats;
 using System;
 using System.Collections.Generic;
-using System.IO;
+//using System.IO;
 using System.Numerics;
 public class Texture : IDisposable{
 	public static Dictionary<string,Texture> all = [];
 	public string path;
 	public uint handle;
 	public GL renderer;
-	public Texture(GL renderer,string path){
+	public Texture(GL renderer,string path){/*
 		if(!File.Exists(path)){return;}
 		using var image = Image.Load<Rgba32>(path);
 		this.renderer = renderer;
@@ -24,7 +24,7 @@ public class Texture : IDisposable{
 				renderer.TexSubImage2D<Rgba32>(TextureTarget.Texture2D,0,0,row,(uint)accessor.Width,1,PixelFormat.Rgba,PixelType.UnsignedByte,accessor.GetRowSpan(row));
 			}
 		});
-		this.SetParameters();
+		this.SetParameters();*/
 	}
 	public Texture(GL renderer,Span<byte> data,Vector2 resolution){
 		this.renderer = renderer;
