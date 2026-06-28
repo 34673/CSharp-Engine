@@ -12,7 +12,7 @@ public class Model{
 	public string path;
 	public string name;
 	public Model(){}
-	public Model(string path) => LoadFile(path);
+	public Model(string path) => Model.LoadFile(path);
 	public static unsafe Model LoadFile(string path){
 		var model = new Model();
 		path = path.Replace('\\','/');
@@ -25,7 +25,7 @@ public class Model{
 		if(scene->MNumMeshes > 0){
 			for(var meshIndex=0;meshIndex<scene->MNumMeshes;++meshIndex){
 				var assimpMesh = scene->MMeshes[meshIndex];
-				var mesh = model.submeshes[assimpMesh->MName] = new(assimpMesh->MName);
+				var mesh = model.submeshes[assimpMesh->MName] = new(assimpMesh->MName,path);
 				if(assimpMesh->MVertices is not null){
 					mesh.vertices = new Vector3[assimpMesh->MNumVertices];
 					new Span<Vector3>(assimpMesh->MVertices,(int)assimpMesh->MNumVertices).CopyTo(new(mesh.vertices));
