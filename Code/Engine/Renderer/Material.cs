@@ -1,5 +1,4 @@
 namespace Engine.Renderer;
-using Engine.Core;
 using System.Collections.Generic;
 using System.IO;
 using System.Globalization;
@@ -12,21 +11,23 @@ public class Material{
 	public string shader;
 	public Dictionary<string,object> properties = [];
 	static Material(){
-		var paths = Directory.EnumerateFiles(FileSystem.contentDirectory,"*.material",SearchOption.AllDirectories);
-		foreach(var path in paths){
-			var key = path.Split(FileSystem.contentDirectory).Last().Replace(".material","").Replace("\\","/").Trim();
-			var material = Material.all[key] = new();
+		var paths = Directory.EnumerateFiles(".","*.material",SearchOption.AllDirectories);
+		foreach(var item in paths){
+			var path = item.Replace("\\", "/");
+			path = path[2..path.LastIndexOf('.')];
+			var material = Material.all[path] = new();
 			material.path = path;
+			material.name = path.Substring(path.LastIndexOf('/') + 1);
 		}
 		var fallback = Material.all["Default"] = new();
 		fallback.name = "Default";
 		fallback.shader = "Default";
 	}
 	public Material(){}
-	public static Material TryLoad(string name){
-		Material.all.TryGetValue(name,out var material);
+	public static Material TryLoad(string path){
+		Material.all.TryGetValue(path,out var material);
 		if(material is null){return Material.all["Default"];}
-		if(name != "Default" && material.properties.Count < 1){material.Load();}
+		if(path != "Default" && material.properties.Count < 1){material.Load();}
 		return material;
 	}
 	public static object ParseValue(string value){
@@ -50,9 +51,7 @@ public class Material{
 			if(scope > 0 && !indented){break;}
 			if(scope == 0){
 				if(!line.Contains(':')){return;}
-				var split = line.Split('=');
-				this.name = split.First().Trim();
-				this.shader = split.Last().Trim(':').Trim();
+				this.shader = line.Replace(":","").Trim();
 				scope += 1;
 				continue;
 			}

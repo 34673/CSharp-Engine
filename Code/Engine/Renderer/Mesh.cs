@@ -11,8 +11,10 @@ public class VertexAttribute(string name="Attribute",Type type=null,int count=0,
 	public bool packed = packed;				//Data should be packed rather than interleaved
 	public bool normalized = normalized;
 }
-public class Mesh(string name="Mesh"){
-	public string name = name;
+public class Mesh{
+	public static Dictionary<string,Mesh> all = [];
+	public string name;
+	public string path;
 	public FaceType faceType;
 	public Dictionary<string,VertexAttribute> vertexFormat = [];
 	public Vector3[] vertices = [];
@@ -20,4 +22,9 @@ public class Mesh(string name="Mesh"){
 	public Vector3[][] uvs = new Vector3[8][];
 	public Vector4[][] colors = new Vector4[8][];
 	public uint[] indices = [];
+	public Mesh(string name="Mesh",string path="*"){
+		this.name = name;
+		this.path = $"{path}:{name}";
+		Mesh.all[path] = this;
+	}
 }

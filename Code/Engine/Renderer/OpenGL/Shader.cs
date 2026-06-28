@@ -1,5 +1,4 @@
 namespace Engine.Renderer.OpenGL;
-using Engine.Core;
 using System;
 using System.Collections.Generic;
 using System.IO;
@@ -8,19 +7,26 @@ using System.Numerics;
 using Silk.NET.OpenGL;
 public class Shader : IDisposable{
 	public static Dictionary<string,Shader> all = [];
+	public static string pathToDefault = "Shaders/@Default.glsl";
 	public string name;
 	public string path;
 	public uint programHandle;
 	public Dictionary<string,uint> stageHandles = [];
 	public OpenGL context;
 	static Shader(){
-		var paths = Directory.EnumerateFiles(FileSystem.contentDirectory,"*.glsl",SearchOption.AllDirectories);
-		foreach(var path in paths){
-			var key = path.Split('/','\\').Last().Replace(".glsl","").Replace("@","");
-			var shader = Shader.all[key] = new();
-			shader.name = $"{key} Program";
+		var paths = Directory.EnumerateFiles(".","*.glsl",SearchOption.AllDirectories);
+		foreach(var item in paths){
+			var path = item.Replace("\\", "/");
+			path = path.Substring(2);
+			var shader = Shader.all[path] = new();
+			shader.name = $"{path.Substring(path.LastIndexOf('/') + 1)} Program";
 			shader.path = path;
 		}
+		if(!Shader.all.ContainsKey(Shader.pathToDefault)){
+			OpenGL.Log(GLEnum.DebugSourceApplication,GLEnum.DebugTypeError,GLEnum.DebugSeverityHigh,"Couldn't load default shader from path 'Shaders/@Default'.");
+			throw new();
+		}
+		Shader.all["Default"] = Shader.all[Shader.pathToDefault];
 	}
 	public Shader(){}
 	public static Shader TryLoad(string name){
@@ -83,7 +89,7 @@ public class Shader : IDisposable{
 		this.context.API.CompileShader(handle);
 		var logs = this.context.API.GetShaderInfoLog(handle);
 		if(!string.IsNullOrWhiteSpace(logs)){
-			throw new($"Error compiling shader of type {type}, failed with error {logs}");
+			OpenGL.Log(GLEnum.DebugSourceShaderCompiler,GLEnum.DebugTypeError,GLEnum.DebugSeverityHigh,logs);
 		}
 		return handle;
 	}
@@ -94,12 +100,19 @@ public class Shader : IDisposable{
 		this.context.API.LinkProgram(this.programHandle);
 		this.context.API.GetProgram(this.programHandle,GLEnum.LinkStatus,out var status);
 		if(status == 0){
-			throw new($"Program failed to link with error: {this.context.API.GetProgramInfoLog(this.programHandle)}");
+			var logs = this.context.API.GetProgramInfoLog(this.programHandle);
+			if(!string.IsNullOrWhiteSpace(logs)){
+				OpenGL.Log(GLEnum.DebugSourceShaderCompiler,GLEnum.DebugTypeError,GLEnum.DebugSeverityHigh,logs);
+				return;
+			}
 		}
 	}
 	public unsafe void SetUniform<Type>(string name,Type value){
 		var location = this.context.API.GetUniformLocation(this.programHandle,name);
-		if(location == -1){throw new($"\"{name}\" uniform not found on shader \"{this.name}\"");}
+		if(location == -1){
+			OpenGL.Log(GLEnum.DebugSourceApplication,GLEnum.DebugTypeError,GLEnum.DebugSeverityHigh,$"Uniform \"{name}\" not found in shader \"{this.name}\"");
+			return;
+		}
 		else if(value is int integer){this.context.API.Uniform1(location,integer);}
 		else if(value is float floatingPoint){this.context.API.Uniform1(location,floatingPoint);}
 		else if(value is Vector2 vector2){this.context.API.Uniform2(location,vector2.X,vector2.Y);}

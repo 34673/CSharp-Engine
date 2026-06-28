@@ -17,15 +17,18 @@ public class OpenGL : IRenderer{
 		Import.window.Load += this.Start;
 		Import.window.Render += this.Update;
 	}
-	public static void Log(GLEnum source,GLEnum type,int id,GLEnum severity,int length,nint message,nint userParam){
+	public static void Log(GLEnum source,GLEnum type,GLEnum severity,string message){
+		OpenGL.Log(source,type,0,severity,message.Length,SilkMarshal.StringToPtr(message));
+	}
+	public static void Log(GLEnum source,GLEnum type,int id,GLEnum severity,int length,nint message,nint userParam=0){
 		var color = Console.ForegroundColor;
 		//if(severity is GLEnum.DebugSeverityNotification){return;}
 		if(severity is GLEnum.DebugSeverityHigh){color = ConsoleColor.Red;}
 		if(severity is GLEnum.DebugSeverityMedium or GLEnum.DebugSeverityLow){color = ConsoleColor.Yellow;}
 		Console.ForegroundColor = color;
 		Console.Write("[OpenGL] ");
-		Console.Write(source.ToString().Replace("DebugSource","")+".");
-		Console.Write(type.ToString().Replace("DebugType","")+": ");
+		Console.Write($"{source}".Replace("DebugSource","From: ") + "|");
+		Console.Write($"{type}".Replace("DebugType","Type: ") + ": ");	
 		Console.WriteLine(SilkMarshal.PtrToString(message));
 		Console.ResetColor();
 	}
@@ -77,58 +80,54 @@ public class OpenGL : IRenderer{
 		}
 		if(globalState.shader != renderObject.shader){renderObject.shader?.Use();}
 	}
-	public void AddModel(string modelPath,string skinPath,Transform transform) => this.AddModel(Model.LoadFile(modelPath),Skin.LoadFile(skinPath),transform);
-	public unsafe void AddModel(Model model,Skin skin,Transform transform){
-		RenderObject.all.TryGetValue(model.name,out var renderObject);
+	public unsafe void AddObject(Mesh mesh,Material material,Transform transform){
+		var objectKey = $"{mesh.path}+{material.path}";
+		RenderObject.all.TryGetValue(objectKey,out var renderObject);
 		if(renderObject is not null){
-			renderObject = RenderObject.all[model.name];
+			renderObject = RenderObject.all[objectKey];
 			renderObject.indirectBuffer.AsSpan<DrawElementsCommand>()[renderObject.indirectOffset].instances += 1;
 			//Add other instance-related data (textures, uniforms, etc...)
 			return;
 		}
-		renderObject = RenderObject.all[model.name] = new();
-		var firstMesh = model.submeshes.First().Value;
-		var format = firstMesh.vertexFormat.Values;
+		renderObject = RenderObject.all[objectKey] = new();
+		var format = mesh.vertexFormat.Values;
 		renderObject.vertexArray = VertexArray.TryGet(format);
 		if(renderObject.vertexArray is null){
 			renderObject.vertexArray = new();
-			renderObject.vertexArray.AddAttributes(firstMesh.vertexFormat.Values);
+			renderObject.vertexArray.AddAttributes(format);
 		}
-		foreach(var mesh in model.submeshes.Values){
-			var data = mesh.vertexFormat.Values.ToArray();
-			var dataSize = data.Sum(x=>Marshal.SizeOf(x.type) * x.count * x.layers) * mesh.vertices.Length;
-			renderObject.vertexBuffers[0] = new(dataSize,$"{mesh.name} Vertex Buffer");
-			var destination = (byte*)renderObject.vertexBuffers[0].pointer;
-			for(var vertex=0;vertex<mesh.vertices.Length;++vertex){
-				mesh.vertices[vertex].CopyTo(new Span<float>(destination,Marshal.SizeOf(mesh.vertices[vertex]) / sizeof(float)));
-				destination += Marshal.SizeOf(mesh.vertices[vertex]);
-				if(mesh.normals.Length > 0){
-					mesh.normals[vertex].CopyTo(new Span<float>(destination,Marshal.SizeOf(mesh.normals[vertex]) / sizeof(float)));
-					destination += Marshal.SizeOf(mesh.normals[vertex]);
-				}
-				foreach(var channel in mesh.uvs){
-					if(channel is null){continue;}
-					channel[vertex].CopyTo(new Span<float>(destination,Marshal.SizeOf(channel[vertex]) / sizeof(float)));
-					destination += Marshal.SizeOf(channel[vertex]);
-				}
-				foreach(var channel in mesh.colors){
-					if(channel is null){continue;}
-					channel[vertex].CopyTo(new Span<float>(destination,Marshal.SizeOf(channel[vertex]) / sizeof(float)));
-					destination += Marshal.SizeOf(channel[vertex]);
-				}
+		var data = mesh.vertexFormat.Values.ToArray();
+		var dataSize = data.Sum(x=>Marshal.SizeOf(x.type) * x.count * x.layers) * mesh.vertices.Length;
+		renderObject.vertexBuffers[0] = new(dataSize,$"{mesh.name} Vertex Buffer");
+		var destination = (byte*)renderObject.vertexBuffers[0].pointer;
+		for(var vertex=0;vertex<mesh.vertices.Length;++vertex){
+			mesh.vertices[vertex].CopyTo(new Span<float>(destination,Marshal.SizeOf(mesh.vertices[vertex]) / sizeof(float)));
+			destination += Marshal.SizeOf(mesh.vertices[vertex]);
+			if(mesh.normals.Length > 0){
+				mesh.normals[vertex].CopyTo(new Span<float>(destination,Marshal.SizeOf(mesh.normals[vertex]) / sizeof(float)));
+				destination += Marshal.SizeOf(mesh.normals[vertex]);
 			}
-			renderObject.indexBuffer = new(sizeof(uint) * mesh.indices.Length,$"{mesh.name} Index Buffer");
-			mesh.indices.AsSpan().CopyTo(renderObject.indexBuffer.AsSpan<uint>());
-			renderObject.indirectBuffer = new(sizeof(DrawElementsCommand),$"{mesh.name} Indirect Buffer");
-			var indirectBuffer = renderObject.indirectBuffer.AsSpan<DrawElementsCommand>();
-			indirectBuffer[0].baseInstance = 0;
-			indirectBuffer[0].baseVertex = 0;
-			indirectBuffer[0].firstIndex = 0;
-			indirectBuffer[0].indexCount = (uint)renderObject.indexBuffer.Count<uint>();
-			indirectBuffer[0].instances = 1;
-			skin.TryGetValue(mesh.name,out var materialName);
-			renderObject.material = Material.TryLoad(materialName ?? "Default");
-			renderObject.shader = Shader.TryLoad(renderObject.material.shader);
+			foreach(var channel in mesh.uvs){
+				if(channel is null){continue;}
+				channel[vertex].CopyTo(new Span<float>(destination,Marshal.SizeOf(channel[vertex]) / sizeof(float)));
+				destination += Marshal.SizeOf(channel[vertex]);
+			}
+			foreach(var channel in mesh.colors){
+				if(channel is null){continue;}
+				channel[vertex].CopyTo(new Span<float>(destination,Marshal.SizeOf(channel[vertex]) / sizeof(float)));
+				destination += Marshal.SizeOf(channel[vertex]);
+			}
 		}
+		renderObject.indexBuffer = new(sizeof(uint) * mesh.indices.Length,$"{mesh.name} Index Buffer");
+		mesh.indices.AsSpan().CopyTo(renderObject.indexBuffer.AsSpan<uint>());
+		renderObject.indirectBuffer = new(sizeof(DrawElementsCommand),$"{mesh.name} Indirect Buffer");
+		var indirectBuffer = renderObject.indirectBuffer.AsSpan<DrawElementsCommand>();
+		indirectBuffer[0].baseInstance = 0;
+		indirectBuffer[0].baseVertex = 0;
+		indirectBuffer[0].firstIndex = 0;
+		indirectBuffer[0].indexCount = (uint)renderObject.indexBuffer.Count<uint>();
+		indirectBuffer[0].instances = 1;
+		renderObject.material = Material.TryLoad(material.path);
+		renderObject.shader = Shader.TryLoad(renderObject.material.shader);
 	}
 }

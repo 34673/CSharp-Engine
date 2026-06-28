@@ -8,6 +8,7 @@ public static class Program{
 	public static SystemTimer frameTimer = new(1000);
 	public static double delta;
 	public static void Main(string[] items){
+		FileSystem.Start();
 		var windowing = Loader.GetAssembly("Engine.Windowing");
 		var renderer = Loader.GetAssembly("Engine.Renderer.OpenGL");
 		var game = Loader.GetAssembly("Game");
