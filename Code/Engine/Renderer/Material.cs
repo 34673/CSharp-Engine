@@ -1,33 +1,22 @@
 namespace Engine.Renderer;
 using System.Collections.Generic;
-using System.IO;
 using System.Globalization;
+using System.IO;
 using System.Linq;
 using System.Numerics;
 public class Material{
 	public static Dictionary<string,Material> all = [];
+	public static Material fallback;
 	public string name;
 	public string path;
-	public string shader;
+	public Dictionary<string,string> shaderPipeline = [];
 	public Dictionary<string,object> properties = [];
-	static Material(){
-		var paths = Directory.EnumerateFiles(".","*.material",SearchOption.AllDirectories);
-		foreach(var item in paths){
-			var path = item.Replace("\\", "/");
-			path = path[2..path.LastIndexOf('.')];
-			var material = Material.all[path] = new();
-			material.path = path;
-			material.name = path.Substring(path.LastIndexOf('/') + 1);
-		}
-		var fallback = Material.all["Default"] = new();
-		fallback.name = "Default";
-		fallback.shader = "Default";
-	}
-	public Material(){}
 	public static Material TryLoad(string path){
 		Material.all.TryGetValue(path,out var material);
-		if(material is null){return Material.all["Default"];}
-		if(path != "Default" && material.properties.Count < 1){material.Load();}
+		if(material is not null){return material;}
+		material = new();
+		material.path = path;
+		material.Load();
 		return material;
 	}
 	public static object ParseValue(string value){
@@ -42,21 +31,24 @@ public class Material{
 		return value.Contains('.') ? float.Parse(value) : int.Parse(value);
 	}
 	public void Load(){
+		if(string.IsNullOrEmpty(this.name)){
+			this.path = this.path.Replace("\\", "/");
+			this.name = this.path.Substring(this.path.LastIndexOf('/') + 1);
+		}
 		var path = this.path.TrimEnd('.');
 		path = path.EndsWith(".material") ? path : $"{path}.material";
 		if(!File.Exists(path)){return;}
-		var scope = 0;
 		foreach(var line in File.ReadAllLines(path)){
-			var indented = line.StartsWith('\t') || line.StartsWith(' ');
-			if(scope > 0 && !indented){break;}
-			if(scope == 0){
-				if(!line.Contains(':')){return;}
-				this.shader = line.Replace(":","").Trim();
-				scope += 1;
+			if(line.TrimStart().StartsWith("//")){continue;}
+			var tokens = line.Trim('\t').Split(' ').Select(x=>x.Trim()).ToArray();
+			if(tokens[0] == "Stage"){
+				if(tokens.Length < 3){throw new("[Material.Load()] Expected usage for Stage keyword: 'Stage <stageName> <pathToShaderFile>'");}
+				this.shaderPipeline[tokens[1]] = tokens[2].Replace("\"","");
 				continue;
 			}
 			var property = line.Trim('\t').Split("=").Select(x=>x.Trim());
 			this.properties[property.First()] = Material.ParseValue(property.Last());
 		}
+		this.shaderPipeline = this.shaderPipeline.OrderBy(x=>x.Key).ToDictionary();
 	}
 }

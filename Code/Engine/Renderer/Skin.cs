@@ -15,7 +15,7 @@ public class Skin : Dictionary<string,string>{
 		foreach(var line in File.ReadAllLines(path)){
 			var split = line.Split(",").Select(x=>x.Trim()).ToArray();
 			if(split[0] == ""){continue;}
-			skin[split[0]] = split[1] == "" ? "Default" : split[1];
+			skin[split[0]] = split[1] == "" ? Material.fallback.path : split[1];
 		}
 		return Skin.all[skin.path] = skin;
 	}

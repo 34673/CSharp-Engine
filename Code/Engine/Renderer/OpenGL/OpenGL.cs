@@ -9,6 +9,7 @@ using System.Runtime.InteropServices;
 using Program = Engine.Core.Program;
 public class OpenGL : IRenderer{
 	public static OpenGL current;
+	public static string defaultMaterialPath = "Shaders/@Default.material";
 	public GL API;
 	public RenderState renderState;
 	public double delta;
@@ -38,6 +39,8 @@ public class OpenGL : IRenderer{
 		var debugParameters = (nint)0;
 		this.API = GL.GetApi(Import.window);
 		Extensions.Start();
+		Material.fallback = Material.TryLoad(OpenGL.defaultMaterialPath);
+		Shader.fallback = Shader.TryLoad(Material.fallback);
 		this.API.Enable(EnableCap.DebugOutput|EnableCap.DepthTest|EnableCap.CullFace);
 		this.API.DebugMessageControl(DebugSource.DontCare,DebugType.DontCare,DebugSeverity.DontCare,0,ref debugIDs,true);
 		this.API.DebugMessageCallback(OpenGL.Log,ref debugParameters);
@@ -128,6 +131,6 @@ public class OpenGL : IRenderer{
 		indirectBuffer[0].indexCount = (uint)renderObject.indexBuffer.Count<uint>();
 		indirectBuffer[0].instances = 1;
 		renderObject.material = Material.TryLoad(material.path);
-		renderObject.shader = Shader.TryLoad(renderObject.material.shader);
+		renderObject.shader = Shader.TryLoad(renderObject.material);
 	}
 }

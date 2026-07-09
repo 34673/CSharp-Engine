@@ -70,7 +70,6 @@ public class Model{
 						offset += indexPerFace;
 					}
 				}
-				model.materials[assimpMesh->MName] = Material.TryLoad("Default");
 			}
 		}
 		Model.importer.FreeScene(scene);

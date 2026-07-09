@@ -1,87 +1,65 @@
 namespace Engine.Renderer.OpenGL;
+using Silk.NET.OpenGL;
 using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
 using System.Numerics;
-using Silk.NET.OpenGL;
 public class Shader : IDisposable{
-	public static Dictionary<string,Shader> all = [];
-	public static string pathToDefault = "Shaders/@Default.glsl";
-	public string name;
-	public string path;
+	public static Dictionary<IEnumerable<string>,Shader> all = new(new PipelineComparer<string>());
+	public static Dictionary<string,ShaderType> stages = new(){
+		{"vertex",ShaderType.VertexShader},
+		{"tessellationcontrol",ShaderType.TessControlShader},
+		{"control",ShaderType.TessControlShader},
+		{"tessellationevaluation",ShaderType.TessEvaluationShader},
+		{"evaluation",ShaderType.TessEvaluationShader},
+		{"geometry",ShaderType.GeometryShader},
+		{"fragment",ShaderType.FragmentShader},
+		{"pixel",ShaderType.FragmentShader},
+		{"compute",ShaderType.ComputeShader}
+	};
+	public static Shader fallback;
 	public uint programHandle;
-	public Dictionary<string,uint> stageHandles = [];
+	public Dictionary<ShaderType,uint> stageHandles = [];
 	public OpenGL context;
-	static Shader(){
-		var paths = Directory.EnumerateFiles(".","*.glsl",SearchOption.AllDirectories);
-		foreach(var item in paths){
-			var path = item.Replace("\\", "/");
-			path = path.Substring(2);
-			var shader = Shader.all[path] = new();
-			shader.name = $"{path.Substring(path.LastIndexOf('/') + 1)} Program";
-			shader.path = path;
+	public static Shader TryLoad(Material material){
+		var stages = new Dictionary<ShaderType,string>();
+		foreach(var (stage,path) in material.shaderPipeline){
+			var stageName = stage.ToLower();
+			if(!Shader.stages.TryGetValue(stageName,out var stageType)){
+				var listPrefix = $"{Environment.NewLine}\t- ";
+				var message = $"Skipping unknown shader stage '{stageName}'. The following stages are supported:{listPrefix}";
+				message += string.Join(listPrefix,Shader.stages.Keys.ToArray());
+				OpenGL.Log(GLEnum.DebugSourceApplication,GLEnum.DebugTypeError,GLEnum.DebugSeverityMedium,message);
+				continue;
+			}
+			if(!File.Exists(path)){
+				OpenGL.Log(GLEnum.DebugSourceApplication,GLEnum.DebugTypeError,GLEnum.DebugSeverityMedium,$"Couldn't find file '{path}'. Skipping stage directive.");
+				continue;
+			}
+			stages[stageType] = path;
 		}
-		if(!Shader.all.ContainsKey(Shader.pathToDefault)){
-			OpenGL.Log(GLEnum.DebugSourceApplication,GLEnum.DebugTypeError,GLEnum.DebugSeverityHigh,"Couldn't load default shader from path 'Shaders/@Default'.");
+		if(!stages.ContainsKey(ShaderType.VertexShader) || !stages.ContainsKey(ShaderType.FragmentShader)){
+			OpenGL.Log(GLEnum.DebugSourceApplication,GLEnum.DebugTypeError,GLEnum.DebugSeverityHigh,"Shader pipeline missing vertex or fragment stage.");
 			throw new();
 		}
-		Shader.all["Default"] = Shader.all[Shader.pathToDefault];
-	}
-	public Shader(){}
-	public static Shader TryLoad(string name){
-		Shader.all.TryGetValue(name,out var shader);
-		if(shader is null){return Shader.all["Default"];}
-		if(shader.stageHandles.Count < 1){
-			shader.context = OpenGL.current;
-			shader.programHandle = shader.context.API.CreateProgram();
-			OpenGL.current.API.ObjectLabel(GLEnum.Program,shader.programHandle,(uint)shader.name.Length,shader.name);
-			shader.Parse();
-			shader.Link();
-			foreach(var stage in shader.stageHandles.Values){
-				shader.context.API.DetachShader(shader.programHandle,stage);
-				shader.context.API.DeleteShader(stage);
-			}
+		var pipeline = stages.Values;
+		Shader.all.TryGetValue(pipeline,out var shader);
+		if(shader is not null){return shader;}
+		shader = new();
+		shader.context = OpenGL.current;
+		shader.programHandle = shader.context.API.CreateProgram();
+		foreach(var (stageType,path) in stages){
+			var name = $"{stageType} '{path}'";
+			shader.stageHandles[stageType] = shader.Compile(stageType,File.ReadAllText(path));
+			shader.context.API.ObjectLabel(GLEnum.Shader,shader.stageHandles[stageType],(uint)name.Length,name);
 		}
-		return shader;
-	}
-	public void Parse(){
-		var stageMap = new Dictionary<string,ShaderType>();
-		var stageType = (ShaderType)(-1);
-		var stageStart = -1;
-		var stageBounds = (start:-1,end:-1);
-		var stage = "";
-		var name = "";
-		stageMap["Vertex"] = ShaderType.VertexShader;
-		stageMap["TessellationControl"] = ShaderType.TessControlShader;
-		stageMap["Control"] = ShaderType.TessControlShader;
-		stageMap["TessellationEvaluation"] = ShaderType.TessEvaluationShader;
-		stageMap["Evaluation"] = ShaderType.TessEvaluationShader;
-		stageMap["Geometry"] = ShaderType.GeometryShader;
-		stageMap["Fragment"] = ShaderType.FragmentShader;
-		stageMap["Pixel"] = ShaderType.FragmentShader;
-		stageMap["Compute"] = ShaderType.ComputeShader;
-		if(!File.Exists(this.path)){return;}
-		var file = File.ReadAllLines(this.path);
-		for(var line=0;line<file.Length;++line){
-			var split = file[line].Split(" ");
-			split = split.Select(x=>x.Trim()).ToArray();
-			if(split.Length < 3){continue;}
-			if(split[0] != "#define" || split[1] != "Stage"){continue;}
-			if(stageStart > -1){
-				stageBounds = (stageStart+1,line);
-				this.stageHandles[stage] = this.Compile(stageType,string.Join("\n",file[stageBounds.start..stageBounds.end]));
-				this.context.API.ObjectLabel(GLEnum.Shader,this.stageHandles[stage],(uint)name.Length,name);
-			}
-			stage = split[2];
-			name = $"{this.name.Replace(" Program","")} {stage}";
-			if(!stageMap.ContainsKey(stage)){continue;}
-			stageType = stageMap[stage];
-			stageStart = line;
+		shader.Link();
+		foreach(var stage in shader.stageHandles.Values){
+			shader.context.API.DetachShader(shader.programHandle,stage);
+			shader.context.API.DeleteShader(stage);
 		}
-		stageBounds = (stageStart+1,file.Length);
-		this.stageHandles[stage] = this.Compile(stageType,string.Join("\n",file[stageBounds.start..stageBounds.end]));
-		this.context.API.ObjectLabel(GLEnum.Shader,this.stageHandles[stage],(uint)name.Length,name);
+		return Shader.all[pipeline] = shader;
 	}
 	public uint Compile(ShaderType type,string source){
 		var handle = this.context.API.CreateShader(type);
@@ -110,7 +88,7 @@ public class Shader : IDisposable{
 	public unsafe void SetUniform<Type>(string name,Type value){
 		var location = this.context.API.GetUniformLocation(this.programHandle,name);
 		if(location == -1){
-			OpenGL.Log(GLEnum.DebugSourceApplication,GLEnum.DebugTypeError,GLEnum.DebugSeverityHigh,$"Uniform \"{name}\" not found in shader \"{this.name}\"");
+			OpenGL.Log(GLEnum.DebugSourceApplication,GLEnum.DebugTypeError,GLEnum.DebugSeverityHigh,$"Uniform \"{name}\" not found in bound shader");
 			return;
 		}
 		else if(value is int integer){this.context.API.Uniform1(location,integer);}
@@ -119,8 +97,13 @@ public class Shader : IDisposable{
 		else if(value is Vector3 vector3){this.context.API.Uniform3(location,vector3.X,vector3.Y,vector3.Z);}
 		else if(value is Vector4 vector4){this.context.API.Uniform4(location,vector4.X,vector4.Y,vector4.Z,vector4.W);}
 		else if(value is Matrix4x4 matrix4x4){this.context.API.UniformMatrix4(location,1,false,(float*)&matrix4x4);}
-		else{throw new($"Unsupported uniform type \"{value.GetType()}\" for property \"{name}\" in shader \"{this.name}\"");}
+		else{throw new($"Unsupported uniform type \"{value.GetType()}\" for property \"{name}\" in bound shader");}
 	}
 	public void Use() => this.context.API.UseProgram(this.programHandle);
 	public void Dispose() => this.context.API.DeleteProgram(this.programHandle);
+	//Based on https://stackoverflow.com/a/14675741
+	public class PipelineComparer<Type> : IEqualityComparer<IEnumerable<Type>>{
+		public bool Equals(IEnumerable<Type> x, IEnumerable<Type> y) => Object.ReferenceEquals(x,y) || (x != null && y != null && x.SequenceEqual(y));
+		public int GetHashCode(IEnumerable<Type> obj) => unchecked(obj.Where(e => e != null).Select(e => e.GetHashCode()).Aggregate(17,(a,b) => 23 * a + b));
+	}
 }

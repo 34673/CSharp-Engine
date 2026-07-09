@@ -17,8 +17,8 @@ public class RenderObject : RenderState{
 		this.uniformSizes = new nuint[Globals.maxUniformBindings];
 		this.shaderStorageOffsets = new int[Globals.maxShaderStorageBindings];
 		this.shaderStorageSizes = new nuint[Globals.maxShaderStorageBindings];
-		this.shader = Shader.all["Default"];
-		this.material = Material.all["Default"];
+		this.shader = Shader.fallback;
+		this.material = Material.fallback;
 	}
 	public static void Sort(){
 		RenderObject.all = RenderObject.all.OrderBy(x=>x.Value.shader)
