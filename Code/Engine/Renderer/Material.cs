@@ -42,12 +42,14 @@ public class Material{
 			if(line.TrimStart().StartsWith("//")){continue;}
 			var tokens = line.Trim('\t').Split(' ').Select(x=>x.Trim()).ToArray();
 			if(tokens[0] == "Stage"){
-				if(tokens.Length < 3){throw new("[Material.Load()] Expected usage for Stage keyword: 'Stage <stageName> <pathToShaderFile>'");}
+				if(tokens.Length < 3){throw new("[Material.Load()] Expected usage for 'Stage' keyword: 'Stage <stageName> <pathToShaderFile>'");}
 				this.shaderPipeline[tokens[1]] = tokens[2].Replace("\"","");
 				continue;
 			}
-			var property = line.Trim('\t').Split("=").Select(x=>x.Trim());
-			this.properties[property.First()] = Material.ParseValue(property.Last());
+			else if(tokens[0] == "Property"){
+				if(tokens.Length < 3){throw new("[Material.Load()] Expected usage for 'Property' keyword: 'Property <Block>.<Property> <value>'");}
+				this.properties[tokens[1]] = Material.ParseValue(tokens[2]);
+			}
 		}
 		this.shaderPipeline = this.shaderPipeline.OrderBy(x=>x.Key).ToDictionary();
 	}

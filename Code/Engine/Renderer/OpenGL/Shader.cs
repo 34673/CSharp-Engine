@@ -4,7 +4,6 @@ using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
-using System.Numerics;
 public class Shader : IDisposable{
 	public static Dictionary<IEnumerable<string>,Shader> all = new(new PipelineComparer<string>());
 	public static Dictionary<string,ShaderType> stages = new(){
@@ -21,6 +20,8 @@ public class Shader : IDisposable{
 	public static Shader fallback;
 	public uint programHandle;
 	public Dictionary<ShaderType,uint> stageHandles = [];
+	public Dictionary<string,InterfaceBlockLayout> uniformBlocks = [];
+	public Dictionary<string,InterfaceBlockLayout> shaderStorageBlocks = [];
 	public OpenGL context;
 	public static Shader TryLoad(Material material){
 		var stages = new Dictionary<ShaderType,string>();
@@ -71,6 +72,63 @@ public class Shader : IDisposable{
 		}
 		return handle;
 	}
+	public unsafe void ReflectLayouts(){
+		var blockProperties = new[]{ProgramResourceProperty.NumActiveVariables,ProgramResourceProperty.NameLength,ProgramResourceProperty.BufferBinding,ProgramResourceProperty.BufferDataSize}; 
+		var activeProperties = new[]{ProgramResourceProperty.ActiveVariables};
+		var ReflectBlock = (ProgramInterface interfaceType) => {
+			this.context.API.GetProgramInterface(this.programHandle,interfaceType,ProgramInterfacePName.ActiveResources,out var blockCount);
+			var blockInfo = new int[blockProperties.Length];
+			var blocks = interfaceType == ProgramInterface.UniformBlock ? this.uniformBlocks : this.shaderStorageBlocks;
+			for(var blockIndex=0u;blockIndex<blockCount;blockIndex+=1){
+				this.context.API.GetProgramResource(this.programHandle,interfaceType,blockIndex,blockProperties,null,blockInfo);
+				this.context.API.GetProgramResourceName(this.programHandle,interfaceType,blockIndex,(uint)blockInfo[1],out _,out string blockName);
+				if(blockInfo[0] < 1){continue;}
+				var block = blocks[blockName] = new();
+				block.binding = (uint)blockInfo[2];
+				block.size = (uint)blockInfo[3];
+				block.isUniformBlock = interfaceType == ProgramInterface.UniformBlock;
+				var uniforms = new int[blockInfo[0]];
+				this.context.API.GetProgramResource(this.programHandle,interfaceType,blockIndex,activeProperties,null,uniforms);
+				this.ReflectFields(uniforms,block.fields);
+			}
+		};
+		ReflectBlock(ProgramInterface.UniformBlock);
+		ReflectBlock(ProgramInterface.ShaderStorageBlock);
+	}
+	public unsafe void ReflectFields(Span<int> members,Dictionary<string,ReflectionData> fields){
+		var uniformProperties = new[]{
+			ProgramResourceProperty.NameLength,
+			ProgramResourceProperty.Type,
+			ProgramResourceProperty.Offset,
+			ProgramResourceProperty.ArraySize,
+			ProgramResourceProperty.ArrayStride,
+			ProgramResourceProperty.MatrixStride,
+			ProgramResourceProperty.IsRowMajor
+		};
+		foreach(var uniformIndex in members){
+			var uniformInfo = new int[uniformProperties.Length];
+			this.context.API.GetProgramResource(this.programHandle,ProgramInterface.Uniform,(uint)uniformIndex,uniformProperties,null,uniformInfo);
+			this.context.API.GetProgramResourceName(this.programHandle,ProgramInterface.Uniform,(uint)uniformIndex,(uint)uniformInfo[1],out _,out string uniformName);
+			var uniform = fields[uniformName] = new();
+			var type = (UniformType)uniformInfo[1];
+			if(type == UniformType.Int){uniform.baseType = typeof(int);}
+			else if(type == UniformType.UnsignedInt){uniform.baseType = typeof(uint);}
+			else if(type == UniformType.Float){uniform.baseType = typeof(float);}
+			else if(type == UniformType.Double){uniform.baseType = typeof(double);}
+			else if(type == UniformType.Bool){uniform.baseType = typeof(bool);}
+			uniform.offset = (uint)uniformInfo[2];
+			uniform.arrayLengths.Add((uint)uniformInfo[3]);
+			if(type is UniformType.BoolVec2 or UniformType.DoubleVec2 or UniformType.FloatVec2 or UniformType.IntVec2 or UniformType.UnsignedIntVec2){uniform.components = 2;}
+			else if(type is UniformType.BoolVec3 or UniformType.DoubleVec3 or UniformType.FloatVec3 or UniformType.IntVec3 or UniformType.UnsignedIntVec3){uniform.components = 4;}
+			else if(type is UniformType.BoolVec4 or UniformType.DoubleVec4 or UniformType.FloatVec4 or UniformType.IntVec4 or UniformType.UnsignedIntVec4){uniform.components = 4;}
+			else if(type is UniformType.DoubleMat2 or UniformType.DoubleMat2x3 or UniformType.DoubleMat2x4){uniform.components = 2;}
+			else if(type is UniformType.DoubleMat3 or UniformType.DoubleMat3x2 or UniformType.DoubleMat3x4){uniform.components = 4;}
+			else if(type is UniformType.DoubleMat4 or UniformType.DoubleMat4x2 or UniformType.DoubleMat4x3){uniform.components = 4;}
+			else if(type is UniformType.FloatMat2 or UniformType.FloatMat2x3 or UniformType.FloatMat2x4){uniform.components = 2;}
+			else if(type is UniformType.FloatMat3 or UniformType.FloatMat3x2 or UniformType.FloatMat3x4){uniform.components = 4;}
+			else if(type is UniformType.FloatMat4 or UniformType.FloatMat4x2 or UniformType.FloatMat4x3){uniform.components = 4;}
+		}
+	}
 	public void Link(){
 		foreach(var stage in this.stageHandles.Values){
 			this.context.API.AttachShader(this.programHandle,stage);
@@ -84,26 +142,26 @@ public class Shader : IDisposable{
 				return;
 			}
 		}
-	}
-	public unsafe void SetUniform<Type>(string name,Type value){
-		var location = this.context.API.GetUniformLocation(this.programHandle,name);
-		if(location == -1){
-			OpenGL.Log(GLEnum.DebugSourceApplication,GLEnum.DebugTypeError,GLEnum.DebugSeverityHigh,$"Uniform \"{name}\" not found in bound shader");
-			return;
-		}
-		else if(value is int integer){this.context.API.Uniform1(location,integer);}
-		else if(value is float floatingPoint){this.context.API.Uniform1(location,floatingPoint);}
-		else if(value is Vector2 vector2){this.context.API.Uniform2(location,vector2.X,vector2.Y);}
-		else if(value is Vector3 vector3){this.context.API.Uniform3(location,vector3.X,vector3.Y,vector3.Z);}
-		else if(value is Vector4 vector4){this.context.API.Uniform4(location,vector4.X,vector4.Y,vector4.Z,vector4.W);}
-		else if(value is Matrix4x4 matrix4x4){this.context.API.UniformMatrix4(location,1,false,(float*)&matrix4x4);}
-		else{throw new($"Unsupported uniform type \"{value.GetType()}\" for property \"{name}\" in bound shader");}
+		this.ReflectLayouts();
 	}
 	public void Use() => this.context.API.UseProgram(this.programHandle);
 	public void Dispose() => this.context.API.DeleteProgram(this.programHandle);
 	//Based on https://stackoverflow.com/a/14675741
 	public class PipelineComparer<Type> : IEqualityComparer<IEnumerable<Type>>{
-		public bool Equals(IEnumerable<Type> x, IEnumerable<Type> y) => Object.ReferenceEquals(x,y) || (x != null && y != null && x.SequenceEqual(y));
+		public bool Equals(IEnumerable<Type> x,IEnumerable<Type> y) => Object.ReferenceEquals(x,y) || (x != null && y != null && x.SequenceEqual(y));
 		public int GetHashCode(IEnumerable<Type> obj) => unchecked(obj.Where(e => e != null).Select(e => e.GetHashCode()).Aggregate(17,(a,b) => 23 * a + b));
 	}
+}
+public class ReflectionData{
+	public Type baseType;
+	public uint offset;
+	public List<uint> arrayLengths = [];
+	public uint components = 1;
+	public Dictionary<string,ReflectionData> children = [];
+}
+public class InterfaceBlockLayout{
+	public uint binding;
+	public uint size;
+	public bool isUniformBlock;
+	public Dictionary<string,ReflectionData> fields = [];
 }

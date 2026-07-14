@@ -55,33 +55,10 @@ public class OpenGL : IRenderer{
 		RenderObject.Sort();
 		this.API.Clear(ClearBufferMask.ColorBufferBit|ClearBufferMask.DepthBufferBit|ClearBufferMask.StencilBufferBit);
 		foreach(var renderObject in RenderObject.all.Values){
-			this.CheckRenderState(renderObject);
-			foreach(var (name,property) in renderObject.material.properties){
-				renderObject.shader.SetUniform(name,property);
-			}
+			renderObject.ApplyStates();
 			//renderObject.shader.SetUniform("objectMatrix",renderObject.transform.matrix);
 			this.API.MultiDrawElementsIndirect<DrawElementsCommand>(PrimitiveType.Triangles,DrawElementsType.UnsignedInt,null,1,0);
 		}
-	}
-	public void CheckRenderState(RenderObject renderObject){
-		var globalState = this.renderState;
-		renderObject.indirectBuffer?.BindIndirect();
-		renderObject.vertexArray?.Bind();
-		renderObject.vertexArray?.SetIndexBuffer(renderObject.indexBuffer);
-		for(var index = 0; index < renderObject.vertexBuffers.Length; index += 1){
-			renderObject.vertexArray?.SetVertexBuffer(renderObject.vertexBuffers[index],index,renderObject.vertexOffset);
-		}
-		for(var index = 0; index < renderObject.uniformBuffers.Length; index += 1){
-			renderObject.uniformBuffers[index]?.BindRange(true,renderObject.uniformOffsets[index],renderObject.uniformSizes[index]);
-		}
-		for(var index = 0; index < renderObject.shaderStorageBuffers.Length; index += 1){
-			renderObject.shaderStorageBuffers[index]?.BindRange(false,renderObject.shaderStorageOffsets[index],renderObject.shaderStorageSizes[index]);
-		}
-		for(var index = 0; index < renderObject.textures.Length; index += 1){
-			if(globalState.textures[index] == renderObject.textures[index]){continue;}
-			renderObject.textures[index]?.Bind((TextureUnit)index);
-		}
-		if(globalState.shader != renderObject.shader){renderObject.shader?.Use();}
 	}
 	public unsafe void AddObject(Mesh mesh,Material material,Transform transform){
 		var objectKey = $"{mesh.path}+{material.path}";
@@ -99,8 +76,8 @@ public class OpenGL : IRenderer{
 			renderObject.vertexArray = new();
 			renderObject.vertexArray.AddAttributes(format);
 		}
-		var data = mesh.vertexFormat.Values.ToArray();
-		var dataSize = data.Sum(x=>Marshal.SizeOf(x.type) * x.count * x.layers) * mesh.vertices.Length;
+		var vertexFormat = mesh.vertexFormat.Values.ToArray();
+		var dataSize = vertexFormat.Sum(x=>Marshal.SizeOf(x.type) * x.count * x.layers) * mesh.vertices.Length;
 		renderObject.vertexBuffers[0] = new(dataSize,$"{mesh.name} Vertex Buffer");
 		var destination = (byte*)renderObject.vertexBuffers[0].pointer;
 		for(var vertex=0;vertex<mesh.vertices.Length;++vertex){
@@ -132,5 +109,14 @@ public class OpenGL : IRenderer{
 		indirectBuffer[0].instances = 1;
 		renderObject.material = Material.TryLoad(material.path);
 		renderObject.shader = Shader.TryLoad(renderObject.material);
+		foreach(var block in renderObject.shader.uniformBlocks.Values){
+			renderObject.uniformBuffers[block.binding] = new((nint)block.size);
+			renderObject.uniformSizes[block.binding] = block.size;
+		}
+		foreach(var block in renderObject.shader.shaderStorageBlocks.Values){
+			renderObject.shaderStorageBuffers[block.binding] = new((nint)block.size);
+			renderObject.shaderStorageSizes[block.binding] = block.size;
+		}
+		renderObject.ApplyMaterial();
 	}
 }

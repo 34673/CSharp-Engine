@@ -8,7 +8,7 @@ public unsafe class Buffer{
 	public uint handle;
 	public nint size;
 	public nint pointer;
-	public Span<Type> AsSpan<Type>() => new((void*)this.pointer,(int)this.size / Marshal.SizeOf<Type>());
+	public Span<Type> AsSpan<Type>(nint offset=0) => new((void*)(this.pointer + offset),(int)(this.size / 3 - offset) / Marshal.SizeOf<Type>());
 	public nint Count<Type>() => this.size / 3 / Marshal.SizeOf<Type>();
 	public Buffer(nint size,string label="Buffer"){
 		var flags = GLEnum.MapWriteBit|GLEnum.MapPersistentBit|GLEnum.MapCoherentBit;
