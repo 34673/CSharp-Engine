@@ -54,7 +54,7 @@ public class RenderObject : RenderState{
 	public void ApplyMaterial(){
 		foreach(var (name,value) in material.properties){
 			var fullName = name.Contains('.') ? name : $"Default.{name}";
-			var (blockName,uniformName) = (fullName[..fullName.LastIndexOf('.')], fullName[fullName.IndexOf('.')..]);
+			var (blockName,uniformName) = (fullName[..fullName.LastIndexOf('.')], fullName[(fullName.IndexOf('.') + 1)..]);
 			var stateBindings = default(Buffer[]);
 			this.shader.uniformBlocks.TryGetValue(blockName,out var block);
 			if(block is null){
@@ -66,7 +66,7 @@ public class RenderObject : RenderState{
 				stateBindings = this.shaderStorageBuffers;
 			}
 			stateBindings ??= this.uniformBuffers;
-			block.fields.TryGetValue(fullName,out var uniform);
+			block.fields.TryGetValue(uniformName,out var uniform);
 			if(uniform is null){
 				OpenGL.Log(GLEnum.DebugSourceApplication,GLEnum.DebugTypeError,GLEnum.DebugSeverityLow,$"Property '{uniformName}' from material '{material.path}' doesn't exist in block {blockName} of referenced shader pipeline.");
 				continue;

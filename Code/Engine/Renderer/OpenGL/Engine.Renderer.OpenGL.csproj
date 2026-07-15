@@ -9,8 +9,10 @@
 		<CopyLocalLockFileAssemblies>true</CopyLocalLockFileAssemblies>
 	</PropertyGroup>
     <ItemGroup>
+        <PackageReference Include="shaderc.net" Version="0.1.0" />
         <PackageReference Include="Silk.NET.OpenGL" Version="2.23.0" />
         <PackageReference Include="Silk.NET.OpenGL.Extensions.ARB" Version="2.23.0" />
+        <PackageReference Include="Silk.NET.SPIRV.Reflect" Version="2.23.0" />
     </ItemGroup>
 	<ItemGroup>
         <ProjectReference Include="..\Engine.Renderer.csproj" />
