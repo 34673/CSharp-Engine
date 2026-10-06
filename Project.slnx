@@ -1,0 +1,12 @@
+<Solution>
+  <Configurations>
+    <Platform Name="Any CPU" />
+    <Platform Name="x64" />
+  </Configurations>
+  <Project Path="Code/Engine/Core/Engine.Core.csproj" />
+  <Project Path="Code/Engine/Renderer/Engine.Renderer.csproj" />
+  <Project Path="Code/Engine/Renderer/OpenGL/Engine.Renderer.OpenGL.csproj" />
+  <Project Path="Code/Engine/Renderer/Vulkan/Engine.Renderer.Vulkan.csproj" />
+  <Project Path="Code/Engine/Windowing/Engine.Windowing.csproj" />
+  <Project Path="Code/Game/Game.csproj" />
+</Solution>

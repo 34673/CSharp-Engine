@@ -9,6 +9,7 @@ public class RenderState{
 	public Texture[] textures;
 	//renderbuffers here
 	public Shader shader;
+	public Buffer[] buffers => [..this.vertexBuffers,this.indexBuffer,this.indirectBuffer,..this.uniformBuffers,..this.shaderStorageBuffers];
 	public RenderState(){
 		this.vertexBuffers = new Buffer[Globals.maxVertexBindings];
 		this.uniformBuffers = new Buffer[Globals.maxUniformBindings];
