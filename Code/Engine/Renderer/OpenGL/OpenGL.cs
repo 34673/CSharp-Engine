@@ -60,10 +60,7 @@ public class OpenGL : IRenderer{
 			foreach(var buffer in buffers){buffer?.WaitSync();}
 			//renderObject.shader.SetUniform("objectMatrix",renderObject.transform.matrix);
 			this.API.MultiDrawElementsIndirect<DrawElementsCommand>(PrimitiveType.Triangles,DrawElementsType.UnsignedInt,null,1,0);
-			foreach(var buffer in buffers){
-				if(buffer is null || !buffer.dirty){continue;}
-				buffer.NextFrame();
-			}
+			foreach(var buffer in buffers){buffer?.NextFrame();}
 		}
 	}
 	public unsafe void AddObject(Mesh mesh,Material material,Transform transform){

@@ -10,6 +10,7 @@ public unsafe class Buffer{
 	public nint pointer;
 	public nint[] fences;
 	public int currentFrame;
+	public bool firstFrame = true;
 	public bool dirty;
 	public Span<Type> AsSpan<Type>(nint offset=0){
 		this.dirty = true;
@@ -31,11 +32,16 @@ public unsafe class Buffer{
 		this.context.API.ClientWaitSync(fence,SyncObjectMask.Bit,ulong.MaxValue);
 		this.context.API.DeleteSync(fence);
 		this.fences[this.currentFrame] = 0;
+		if(this.firstFrame){
+			this.firstFrame = false;
+			return;
+		}
+		if(!this.dirty){return;}
 		var sections = this.fences.Length;
 		var size = this.size / sections;
 		var previousFrame = this.currentFrame == 0 ? sections - 1 : this.currentFrame - 1;
-		var source = (byte*)this.pointer + size * this.currentFrame;
-		var destination = (byte*)this.pointer + size * previousFrame;
+		var source = (byte*)this.pointer + size * previousFrame;
+		var destination = (byte*)this.pointer + size * this.currentFrame;
 		System.Buffer.MemoryCopy(source,destination,size,size);
 		this.dirty = false;
 	}
